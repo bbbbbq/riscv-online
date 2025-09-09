@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 pub use rv32i::RV32I;
 pub use rv64i::RV64I;
 pub use rvc::RVC;
