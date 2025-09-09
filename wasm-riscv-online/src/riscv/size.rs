@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 #[derive(Clone, Copy, Ord, Eq, PartialEq)]
 pub enum Usize {
     U32(u32),

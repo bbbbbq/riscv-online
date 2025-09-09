@@ -6,7 +6,7 @@ const OPCODE_C1: u16 = 0b01;
 const OPCODE_C2: u16 = 0b10;
 
 pub fn resolve_u16(ins: u16, xlen: Xlen) -> core::result::Result<Instruction, ()> {
-    use crate::asm::RVC::*;
+    
     let opcode = ins & 0b11;
     let funct3 = ((ins >> 13) & 0b111) as u8; // keep 0b111 to be explict (actually do not need to & 0b111)
     let funct2 = ((ins >> 5) & 0b11) as u8;

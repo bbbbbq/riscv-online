@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use super::{to_register, BType, IType, JType, RType, SType, UType};
 
 #[derive(Debug, Clone, Copy)]

@@ -127,7 +127,7 @@ impl RVC {
                 to_register(cs.rs1)
             ),
 
-            Self::Cnop(ci) => format!("c.nop"),
+            Self::Cnop(_ci) => format!("c.nop"),
             Self::Caddi(ci) => format!(
                 "c.addi {}, {}, {:?}",
                 to_register(ci.rdrs1),
@@ -282,7 +282,7 @@ impl RVC {
                 to_register(0),
                 to_register(cr.rs2)
             ),
-            Self::Cebreak(cr) => format!("c.ebreak"),
+            Self::Cebreak(_cr) => format!("c.ebreak"),
             Self::Cjalr(cr) => format!("c.jalr {}, 0({})", to_register(1), to_register(cr.rdrs1)),
             Self::Cadd(cr) => format!(
                 "c.add {}, {}, {}",
