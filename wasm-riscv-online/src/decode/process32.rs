@@ -108,8 +108,8 @@ const FUNCT_RS2_CVT_LU: u8 = 0b00011;
 // Atomic instruction funct5 values
 const FUNCT5_A_AMOADD: u8 = 0b00000;
 const FUNCT5_A_AMOSWAP: u8 = 0b00001;
-const FUNCT5_A_LRW: u8 = 0b00010;
-const FUNCT5_A_SCW: u8 = 0b00011;
+const FUNCT5_A_LR: u8 = 0b00010;
+const FUNCT5_A_SC: u8 = 0b00011;
 const FUNCT5_A_AMOXOR: u8 = 0b00100;
 const FUNCT5_A_AMOOR: u8 = 0b01000;
 const FUNCT5_A_AMOAND: u8 = 0b01100;
@@ -119,9 +119,8 @@ const FUNCT5_A_AMOMINU: u8 = 0b11000;
 const FUNCT5_A_AMOMAXU: u8 = 0b11100;
 
 
-
 pub fn resolve_u32(ins: u32, xlen: Xlen) -> core::result::Result<Instruction, ()> {
-    use crate::asm::{RVZicsr::*, RV32I::*, RV64I::*, RVF::*, RV32A::*};
+    use crate::asm::{RVZicsr::*, RV32I::*, RV64I::*, RVF::*, RV32A::*,RV64A::*};
     let opcode = ins & 0b111_1111;
     let rd = ((ins >> 7) & 0b1_1111) as u8;
     let rs1 = ((ins >> 15) & 0b1_1111) as u8;
@@ -490,8 +489,8 @@ pub fn resolve_u32(ins: u32, xlen: Xlen) -> core::result::Result<Instruction, ()
         // atomic instructions
         OPCODE_A => match funct3 {
             FUNCT3_LOAD_LW => match funct5 {
-                FUNCT5_A_LRW => Lrw(r_type).into(),
-                FUNCT5_A_SCW => Scw(r_type).into(),
+                FUNCT5_A_LR => Lrw(r_type).into(),
+                FUNCT5_A_SC => Scw(r_type).into(),
                 FUNCT5_A_AMOSWAP => Amoswapw(r_type).into(),
                 FUNCT5_A_AMOADD => Amoaddw(r_type).into(),
                 FUNCT5_A_AMOXOR => Amoxorw(r_type).into(),
@@ -501,6 +500,20 @@ pub fn resolve_u32(ins: u32, xlen: Xlen) -> core::result::Result<Instruction, ()
                 FUNCT5_A_AMOMAX => Amomaxw(r_type).into(),
                 FUNCT5_A_AMOMINU => Amominuw(r_type).into(),
                 FUNCT5_A_AMOMAXU => Amomaxuw(r_type).into(),
+                _ => Err(())?,
+            },
+            FUNCT3_LOAD_LD => match funct5 {
+                FUNCT5_A_LR => Lrd(r_type).into(),
+                FUNCT5_A_SC => Scd(r_type).into(),
+                FUNCT5_A_AMOSWAP => Amoswapd(r_type).into(),
+                FUNCT5_A_AMOADD => Amoaddd(r_type).into(),
+                FUNCT5_A_AMOXOR => Amoxord(r_type).into(),
+                FUNCT5_A_AMOAND => Amoandd(r_type).into(),
+                FUNCT5_A_AMOOR => Amoord(r_type).into(),
+                FUNCT5_A_AMOMIN => Amomind(r_type).into(),
+                FUNCT5_A_AMOMAX => Amomaxd(r_type).into(),
+                FUNCT5_A_AMOMINU => Amominud(r_type).into(),
+                FUNCT5_A_AMOMAXU => Amomaxud(r_type).into(),
                 _ => Err(())?,
             },
             _ => Err(())?,

@@ -19,6 +19,24 @@ pub enum RV32A {
     Amomaxuw(RType),
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum RV64A {
+    // Load-Reserved/Store-Conditional - Double Word (64-bit)
+    Lrd(RType),
+    Scd(RType),
+    
+    // Atomic Memory Operations - Double Word (64-bit)
+    Amoswapd(RType),
+    Amoaddd(RType),
+    Amoxord(RType),
+    Amoandd(RType),
+    Amoord(RType),
+    Amomind(RType),
+    Amomaxd(RType),
+    Amominud(RType),
+    Amomaxud(RType),
+}
+
 impl RV32A {
     pub fn to_string(&self) -> String {
         match self {
@@ -36,4 +54,22 @@ impl RV32A {
         }
     }
 }
-            
+
+impl RV64A {
+    pub fn to_string(&self) -> String {
+        match self {
+            Self::Lrd(r) => format!("lr.d {}, {}", to_register(r.rd), to_register(r.rs1)),
+            Self::Scd(r) => format!("sc.d {}, {}", to_register(r.rs2), to_register(r.rs1)),
+            Self::Amoswapd(r) => format!("amoswap.d {} ,{}, {}", to_register(r.rd),to_register(r.rs2), to_register(r.rs1)),
+            Self::Amoaddd(r) => format!("amoadd.d {} ,{}, {}", to_register(r.rd),to_register(r.rs2), to_register(r.rs1)),
+            Self::Amoxord(r) => format!("amoxor.d {} ,{}, {}", to_register(r.rd),to_register(r.rs2), to_register(r.rs1)),
+            Self::Amoandd(r) => format!("amoand.d {} ,{}, {}", to_register(r.rd),to_register(r.rs2), to_register(r.rs1)),
+            Self::Amoord(r) => format!("amoor.d {} ,{}, {}", to_register(r.rd),to_register(r.rs2), to_register(r.rs1)),
+            Self::Amomind(r) => format!("amomin.d {} ,{}, {}", to_register(r.rd),to_register(r.rs2), to_register(r.rs1)),
+            Self::Amomaxd(r) => format!("amomax.d {} ,{}, {}", to_register(r.rd),to_register(r.rs2), to_register(r.rs1)),
+            Self::Amominud(r) => format!("amominu.d {} ,{}, {}", to_register(r.rd),to_register(r.rs2), to_register(r.rs1)),
+            Self::Amomaxud(r) => format!("amomaxu.d {} ,{}, {}", to_register(r.rd),to_register(r.rs2), to_register(r.rs1)),
+        }
+    }
+}
+        
