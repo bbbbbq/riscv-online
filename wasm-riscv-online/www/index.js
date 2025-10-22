@@ -21,21 +21,29 @@ try {
 
     // 输入验证函数  
     function validateHexInput(value) {
-        if (!value.trim()) {
+        const trimmed = value.trim();
+        if (!trimmed) {
             return { valid: false, message: '请输入内容', type: 'warning' };
         }
 
+        // 判断是否为010字节流
+        const byteStreamPattern = /^([0-9a-fA-F]{2}(\s+|$))+$/;
+        if (byteStreamPattern.test(trimmed.replace(/\r\n/g, '\n').split('\n').map(l => l.trim()).join(' '))) {
+            return { valid: true, message: '字节流格式', type: 'valid', format: 'byteStream' };
+        }
+
+        // 否则逐行检查每行是否为十六进制串
         const lines = value.split('\n').filter(line => line.trim());
         const hexPattern = /^(0x|0X)?[0-9a-fA-F]+$/;
 
         for (let line of lines) {
             const cleanLine = line.trim();
             if (!hexPattern.test(cleanLine)) {
-                return { valid: false, message: '包含无效的十六进制格式', type: 'error' };
+                return { valid: false, message: '包含无效的十六进制格式', type: 'error', format: null };
             }
         }
 
-        return { valid: true, message: `${lines.length} 条指令`, type: 'valid' };
+        return { valid: true, message: `${lines.length} 条指令`, type: 'valid', format: 'hex' };
     }
 
     // 更新输入状态显示  
@@ -53,6 +61,50 @@ try {
         setTimeout(() => {
             errorMessage.classList.remove('show');
         }, 5000);
+    }
+    
+    // 解析 010 Editor 字节流为按行hex指令
+    function parseByteStream(value) {
+        // 规范化空白并分割字节 token（每个 token 应为两位十六进制）
+        const tokens = value.replace(/\r\n/g, '\n').split(/\s+/).filter(Boolean);
+        if (tokens.length === 0) return [];
+
+        for (const t of tokens) {
+            if (!/^[0-9a-fA-F]{2}$/.test(t)) {
+                throw new Error(`非法字节 token: "${t}"`);
+            }
+        }
+
+        const lower = tokens.map(t => t.toLowerCase());
+        const instructions = [];
+        let i = 0;
+        while (i < lower.length) {
+            if (i + 1 >= lower.length) {
+                throw new Error('指令不完整，剩余字节不足');
+            }
+            const b0 = lower[i];     // 低字节（小端）
+            const b1 = lower[i + 1]; // 高字节（小端的高）
+            const value16 = (parseInt(b0, 16)) | (parseInt(b1, 16) << 8);
+
+            // 如果最低两位为 11 -> 32 位指令（再读两个字节）
+            if ((value16 & 0x3) === 0x3) {
+                if (i + 3 >= lower.length) {
+                    throw new Error('指令不完整，剩余字节不足');
+                }
+                const b2 = lower[i + 2];
+                const b3 = lower[i + 3];
+                // 为显示和后续处理生成大端顺序的 hex 字符（b3 b2 b1 b0）
+                const hexBE = (b3 + b2 + b1 + b0).toLowerCase();
+                instructions.push('0x' + hexBE.padStart(8, '0'));
+                i += 4;
+            } else {
+                // 16 位指令，大端顺序 b1 b0
+                const hexBE = (b1 + b0).toLowerCase();
+                instructions.push('0x' + hexBE.padStart(4, '0'));
+                i += 2;
+            }
+        }
+        return instructions;
     }
 
     // 根据 XLEN 模式调用合适的 WASM 导出函数
@@ -117,12 +169,23 @@ try {
     function handleConversion() {
         if (isProcessing) return;
 
-        const inputValue = input.value.trim();
+        let inputValue = input.value.trim();
         const validation = validateHexInput(inputValue);
 
         if (!validation.valid) {
             showError(validation.message);
             return;
+        }
+
+        if (validation.format === 'byteStream') {
+            //转换为16进制格式
+            try {
+                const instructions = parseByteStream(inputValue);
+                inputValue = instructions.join('\n');
+            } catch (err) {
+                showError(`${err.message}`);
+                return;
+            }
         }
 
         isProcessing = true;
