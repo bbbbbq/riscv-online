@@ -26,8 +26,8 @@ try {
         }
 
         // 判断是否为010字节流
-        const byteStreamPattern = /^([0-9a-fA-F]{2}[\s\r\n]*)+$/;
-        if (byteStreamPattern.test(trimmed.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' '))) {
+        const byteStreamPattern = /^([0-9a-fA-F]{2}(\s+|$))+$/;
+        if (byteStreamPattern.test(trimmed.replace(/\r\n/g, '\n').split('\n').map(l => l.trim()).join(' '))) {
             return { valid: true, message: '字节流格式', type: 'valid', format: 'byteStream' };
         }
 
