@@ -1,6 +1,11 @@
-use wasm_riscv_online::{assemble_with_xlen, assemble_auto};
+#![cfg(target_arch = "wasm32")]
 
-#[test]
+extern crate wasm_bindgen_test;
+use wasm_bindgen_test::*;
+wasm_bindgen_test_configure!(run_in_node);
+use wasm_riscv_online::{assemble_auto, assemble_with_xlen};
+
+#[wasm_bindgen_test]
 fn rv32i_basic_encode() {
     // addi x1, x2, 10 -> 0x00a10093
     let out = assemble_with_xlen("addi x1, x2, 10", 32);
@@ -35,7 +40,7 @@ fn rv32i_basic_encode() {
     assert_eq!(out.trim(), "0x123451b7");
 }
 
-#[test]
+#[wasm_bindgen_test]
 fn rv64i_w_variants_and_loads() {
     // addiw a0, a0, 1 -> 0x0015051b
     let out = assemble_with_xlen("addiw a0, a0, 1", 64);
@@ -52,7 +57,7 @@ fn rv64i_w_variants_and_loads() {
     assert_eq!(out64.trim(), "0x00013083"); // ld rd=1 rs1=2 imm=0 -> opcode LOAD, funct3=011
 }
 
-#[test]
+#[wasm_bindgen_test]
 fn zicsr_and_system() {
     // csrrw x1, 0x305, x2 -> csr=0x305, rs1=2, rd=1
     let out = assemble_with_xlen("csrrw x1, 0x305, x2", 32);
