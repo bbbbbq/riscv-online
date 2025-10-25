@@ -2,6 +2,8 @@ mod asm;
 mod decode;
 mod riscv;
 
+mod isa;
+
 use decode::{resolve_u16, resolve_u32};
 use riscv::imm::Xlen;
 use wasm_bindgen::prelude::*;

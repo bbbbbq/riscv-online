@@ -1,9 +1,6 @@
 use super::c_reg;
 use crate::{asm::Instruction,asm::*, riscv::imm::{Imm, Uimm, Xlen}};
-
-const OPCODE_C0: u16 = 0b00;
-const OPCODE_C1: u16 = 0b01;
-const OPCODE_C2: u16 = 0b10;
+use crate::isa::*;
 
 pub fn resolve_u16(ins: u16, xlen: Xlen) -> core::result::Result<Instruction, ()> {
     
