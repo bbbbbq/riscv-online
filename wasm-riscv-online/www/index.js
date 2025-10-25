@@ -13,13 +13,14 @@ try {
     const copyButton = document.getElementById('copyButton');
     const input = document.getElementById('input');
     const xlenSelect = document.getElementById('xlenSelect');
+    const modeSelect = document.getElementById('modeSelect');
     const inputDisplay = document.getElementById('inputDisplay');
     const outputDisplay = document.getElementById('outputDisplay');
     const inputStatus = document.getElementById('inputStatus');
     const errorMessage = document.getElementById('errorMessage');
     const keyboardShortcuts = document.getElementById('keyboardShortcuts');
 
-    // 输入验证函数  
+    // 输入验证函数（反汇编-十六进制）  
     function validateHexInput(value) {
         const trimmed = value.trim();
         if (!trimmed) {
@@ -44,6 +45,15 @@ try {
         }
 
         return { valid: true, message: `${lines.length} 条指令`, type: 'valid', format: 'hex' };
+    }
+
+    // 输入验证函数（汇编-文本）
+    function validateAsmInput(value) {
+        const lines = value.split('\n').map(l => l.trim()).filter(Boolean);
+        if (lines.length === 0) {
+            return { valid: false, message: '请输入内容', type: 'warning' };
+        }
+        return { valid: true, message: `${lines.length} 条指令`, type: 'valid', format: 'asm' };
     }
 
     // 更新输入状态显示  
@@ -107,7 +117,7 @@ try {
         return instructions;
     }
 
-    // 根据 XLEN 模式调用合适的 WASM 导出函数
+    // 根据 XLEN 模式调用合适的 WASM 导出函数（反汇编）
     function disassembleByMode(formattedHex) {
         const mode = xlenSelect ? xlenSelect.value : 'auto';
         if (mode === 'auto') {
@@ -115,6 +125,16 @@ try {
         }
         const xlen = parseInt(mode, 10);
         return wasm.disassemble_with_xlen(formattedHex, xlen);
+    }
+
+    // 根据 XLEN 模式调用合适的 WASM 导出函数（汇编，整块文本）
+    function assembleByModeWhole(text) {
+        const mode = xlenSelect ? xlenSelect.value : 'auto';
+        if (mode === 'auto') {
+            return wasm.assemble_auto(text);
+        }
+        const xlen = parseInt(mode, 10);
+        return wasm.assemble_with_xlen(text, xlen);
     }
 
     // 处理单条指令  
@@ -165,20 +185,14 @@ try {
                 '<span class="assembly-immediate">$1</span>');
     }
 
-    // 主要的转换处理函数  
+    // 主要的转换处理函数（根据模式分支）  
     function handleConversion() {
         if (isProcessing) return;
-
+        const mode = modeSelect ? modeSelect.value : 'disassemble';
         let inputValue = input.value.trim();
-        const validation = validateHexInput(inputValue);
-
-        if (!validation.valid) {
-            showError(validation.message);
-            return;
-        }
-
-        if (validation.format === 'byteStream') {
-            //转换为16进制格式
+        const validation = mode === 'assemble' ? validateAsmInput(inputValue) : validateHexInput(inputValue);
+        if (!validation.valid) { showError(validation.message); return; }
+        if (mode === 'disassemble' && validation.format === 'byteStream') {
             try {
                 const instructions = parseByteStream(inputValue);
                 inputValue = instructions.join('\n');
@@ -193,30 +207,30 @@ try {
         convertButton.classList.add('loading');
 
         try {
-            const lines = inputValue.split('\n').filter(line => line.trim());
-            const results = [];
-            const inputs = [];
-
-            for (let line of lines) {
-                const cleanLine = line.trim();
-                try {
-                    const result = processSingleInstruction(cleanLine);
-                    inputs.push(result.formatted);
-                    results.push(result.result);
-                } catch (error) {
-                    inputs.push(cleanLine);
-                    results.push(`Error: ${error.message}`);
+            if (mode === 'disassemble') {
+                const lines = inputValue.split('\n').filter(line => line.trim());
+                const results = [];
+                const inputs = [];
+                for (let line of lines) {
+                    const cleanLine = line.trim();
+                    try {
+                        const result = processSingleInstruction(cleanLine);
+                        inputs.push(result.formatted);
+                        results.push(result.result);
+                    } catch (error) {
+                        inputs.push(cleanLine);
+                        results.push(`Error: ${error.message}`);
+                    }
                 }
+                inputDisplay.innerHTML = inputs.map(input => `<div style="margin: 2px 0;">${input}</div>`).join('');
+                outputDisplay.innerHTML = results.map(result => `<div style="margin: 2px 0;" class="assembly-output">${highlightAssembly(result)}</div>`).join('');
+            } else { // assemble
+                const outText = assembleByModeWhole(inputValue);
+                const inLines = inputValue.split('\n').filter(l => l.trim());
+                const outLines = outText.split('\n');
+                inputDisplay.innerHTML = inLines.map(l => `<div style="margin: 2px 0;">${l}</div>`).join('');
+                outputDisplay.innerHTML = outLines.map(r => `<div style="margin: 2px 0;" class="assembly-output">${r}</div>`).join('');
             }
-
-            // 显示结果  
-            inputDisplay.innerHTML = inputs.map(input =>
-                `<div style="margin: 2px 0;">${input}</div>`
-            ).join('');
-
-            outputDisplay.innerHTML = results.map(result =>
-                `<div style="margin: 2px 0;" class="assembly-output">${highlightAssembly(result)}</div>`
-            ).join('');
 
         } catch (error) {
             showError(`处理失败：${error.message}`);
@@ -274,10 +288,35 @@ try {
     input.addEventListener('input', () => {
         clearTimeout(inputDebounceTimer);          // 取消上一次的计时器
         inputDebounceTimer = setTimeout(() => {    // 重新计时
-            const validation = validateHexInput(input.value);
+            const mode = modeSelect ? modeSelect.value : 'disassemble';
+            const validation = mode === 'assemble' ? validateAsmInput(input.value) : validateHexInput(input.value);
             updateInputStatus(validation);
         }, 300);  // 300 ms 内没再输入才真正执行
     });
+
+    // 模式切换时更新占位与按钮文字
+    function updateModeUI() {
+        const mode = modeSelect ? modeSelect.value : 'disassemble';
+        const buttonSpan = convertButton.querySelector('span');
+        if (mode === 'assemble') {
+            input.placeholder = '请输入 RISC-V 汇编，每行一条...\n\n示例：\naddi a0, a0, 1\nld x1, 0(x2)';
+            buttonSpan.textContent = '转换/汇编';
+            inputDisplay.innerHTML = '<div style="color: #666; font-style: italic;">输入的汇编将显示在这里...</div>';
+            outputDisplay.innerHTML = '<div style="color: #666; font-style: italic;">机器码将显示在这里...</div>';
+        } else {
+            input.placeholder = '请输入十六进制机器码，支持多行输入...\n\n示例：\n0x00000013\n0x00100093\n0x00208233';
+            buttonSpan.textContent = '转换/反汇编';
+            inputDisplay.innerHTML = '<div style="color: #666; font-style: italic;">输入的机器码将显示在这里...</div>';
+            outputDisplay.innerHTML = '<div style="color: #666; font-style: italic;">反汇编结果将显示在这里...</div>';
+        }
+        // 重新校验
+        const validation = mode === 'assemble' ? validateAsmInput(input.value) : validateHexInput(input.value);
+        updateInputStatus(validation);
+    }
+    if (modeSelect) {
+        modeSelect.addEventListener('change', updateModeUI);
+        updateModeUI();
+    }
 
     // 键盘快捷键  
     document.addEventListener('keydown', (event) => {
