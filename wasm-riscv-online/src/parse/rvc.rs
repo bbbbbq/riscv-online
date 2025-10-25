@@ -25,6 +25,110 @@ pub(crate) fn try_parse(mnem: &str, ops: &[String], xlen: Xlen) -> Option<Result
             let ci = CIType { rdrs1: rd, funct3: 0, imm: Imm::new(imm_bits, 6) };
             Some(Ok(RVC::Caddi(ci).into()))
         }
+        // c.addi16sp imm  (sp implicit)
+        "c.addi16sp" => {
+            if ops.len() != 1 { return Some(Err("用法: c.addi16sp imm".into())); }
+            let imm = match parse_int(&ops[0]) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            // 10-bit nzimm
+            let imm_bits = match imm_signed_bits(imm, 10) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let ci = CIType { rdrs1: 2, funct3: 0, imm: Imm::new(imm_bits, 10) };
+            Some(Ok(RVC::Caddi16sp(ci).into()))
+        }
+        // c.addiw rd, imm (RV64/128)
+        "c.addiw" => {
+            if ops.len() != 2 { return Some(Err("用法: c.addiw rd, imm".into())); }
+            match xlen { Xlen::X64 | Xlen::X128 => {}, _ => return Some(Err("c.addiw 仅在 RV64/128 可用".into())) }
+            let rd = match parse_register(&ops[0]) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let imm = match parse_int(&ops[1]) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let imm_bits = match imm_signed_bits(imm, 6) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let ci = CIType { rdrs1: rd, funct3: 0, imm: Imm::new(imm_bits, 6) };
+            Some(Ok(RVC::Caddiw(ci).into()))
+        }
+        // c.slli rd, shamt
+        "c.slli" => {
+            if ops.len() != 2 { return Some(Err("用法: c.slli rd, shamt".into())); }
+            let rd = match parse_register(&ops[0]) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let sh = match parse_int(&ops[1]) { Ok(v) => v as u32, Err(e) => return Some(Err(e)) };
+            let ci = CIType { rdrs1: rd, funct3: 0, imm: Imm::new(sh, 6) };
+            Some(Ok(RVC::Cslli(ci).into()))
+        }
+        // c.srli rd, shamt  (rd 应为压缩寄存器，编码阶段校验)
+        "c.srli" => {
+            if ops.len() != 2 { return Some(Err("用法: c.srli rd, shamt".into())); }
+            let rd = match parse_register(&ops[0]) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let sh = match parse_int(&ops[1]) { Ok(v) => v as u32, Err(e) => return Some(Err(e)) };
+            let ci = CIType { rdrs1: rd, funct3: 0, imm: Imm::new(sh, 6) };
+            Some(Ok(RVC::Csrli(ci).into()))
+        }
+        // c.srai rd, shamt
+        "c.srai" => {
+            if ops.len() != 2 { return Some(Err("用法: c.srai rd, shamt".into())); }
+            let rd = match parse_register(&ops[0]) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let sh = match parse_int(&ops[1]) { Ok(v) => v as u32, Err(e) => return Some(Err(e)) };
+            let ci = CIType { rdrs1: rd, funct3: 0, imm: Imm::new(sh, 6) };
+            Some(Ok(RVC::Csrai(ci).into()))
+        }
+        // c.andi rd, imm
+        "c.andi" => {
+            if ops.len() != 2 { return Some(Err("用法: c.andi rd, imm".into())); }
+            let rd = match parse_register(&ops[0]) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let imm = match parse_int(&ops[1]) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let imm_bits = match imm_signed_bits(imm, 6) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let ci = CIType { rdrs1: rd, funct3: 0, imm: Imm::new(imm_bits, 6) };
+            Some(Ok(RVC::Candi(ci).into()))
+        }
+        // CA logic: c.sub/xor/or/and  (rd', rs2')
+        "c.sub" | "c.xor" | "c.or" | "c.and" => {
+            if ops.len() != 2 { return Some(Err("用法: c.{sub|xor|or|and} rd, rs2".into())); }
+            let rd = match parse_register(&ops[0]) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let rs2 = match parse_register(&ops[1]) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let ca = CAType { rdrs1: rd, rs2, funct2: 0, funct6: 0 };
+            let inst = match mnem {
+                "c.sub" => RVC::Csub(ca).into(),
+                "c.xor" => RVC::Cxor(ca).into(),
+                "c.or"  => RVC::Cor(ca).into(),
+                "c.and" => RVC::Cand(ca).into(),
+                _ => unreachable!(),
+            };
+            Some(Ok(inst))
+        }
+        // CA W-variants (RV64/128): c.subw/c.addw  (rd', rs2')
+        "c.subw" | "c.addw" => {
+            if ops.len() != 2 { return Some(Err("用法: c.{subw|addw} rd, rs2".into())); }
+            match xlen { Xlen::X64 | Xlen::X128 => {}, _ => return Some(Err("该宽度变体仅在 RV64/128 可用".into())) }
+            let rd = match parse_register(&ops[0]) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let rs2 = match parse_register(&ops[1]) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let ca = CAType { rdrs1: rd, rs2, funct2: 0, funct6: 0 };
+            let inst = match mnem { "c.subw" => RVC::Csubw(ca).into(), _ => RVC::Caddw(ca).into() };
+            Some(Ok(inst))
+        }
+        // CR group: c.mv rd, rs2 ; c.add rd, rs2 ; c.jr rs1 ; c.jalr rs1
+        "c.mv" => {
+            if ops.len() != 2 { return Some(Err("用法: c.mv rd, rs2".into())); }
+            let rd = match parse_register(&ops[0]) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let rs2 = match parse_register(&ops[1]) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let cr = CRType { rdrs1: rd, rs2, funct4: 0 };
+            Some(Ok(RVC::Cmv(cr).into()))
+        }
+        "c.add" => {
+            if ops.len() != 2 { return Some(Err("用法: c.add rd, rs2".into())); }
+            let rd = match parse_register(&ops[0]) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let rs2 = match parse_register(&ops[1]) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let cr = CRType { rdrs1: rd, rs2, funct4: 0 };
+            Some(Ok(RVC::Cadd(cr).into()))
+        }
+        "c.jr" => {
+            if ops.len() != 1 { return Some(Err("用法: c.jr rs1".into())); }
+            let rs1 = match parse_register(&ops[0]) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let cr = CRType { rdrs1: rs1, rs2: 0, funct4: 0 };
+            Some(Ok(RVC::Cjr(cr).into()))
+        }
+        "c.jalr" => {
+            if ops.len() != 1 { return Some(Err("用法: c.jalr rs1".into())); }
+            let rs1 = match parse_register(&ops[0]) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let cr = CRType { rdrs1: rs1, rs2: 0, funct4: 0 };
+            Some(Ok(RVC::Cjalr(cr).into()))
+        }
         // c.li rd, imm
         "c.li" => {
             if ops.len() != 2 { return Some(Err("用法: c.li rd, imm".into())); }
