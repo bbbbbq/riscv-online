@@ -10,6 +10,7 @@ use decode::{resolve_u16, resolve_u32};
 use riscv::imm::Xlen;
 use wasm_bindgen::prelude::*;
 use encode::process32::encode_u32;
+use encode::process16::encode_u16;
 
 #[wasm_bindgen]
 pub fn disassemble(input: &str) -> String {
@@ -36,6 +37,7 @@ pub fn disassemble(input: &str) -> String {
 }
 
 fn to_hex_u32(v: u32) -> String { format!("0x{:08x}", v) }
+fn to_hex_u16(v: u16) -> String { format!("0x{:04x}", v) }
 
 #[wasm_bindgen]
 pub fn assemble_with_xlen(input: &str, xlen_bits: u32) -> String {
@@ -51,9 +53,17 @@ pub fn assemble_with_xlen(input: &str, xlen_bits: u32) -> String {
         let trimmed = line.trim();
         if trimmed.is_empty() { continue; }
         match crate::parse::parse_line(trimmed, xlen) {
-            Ok(inst) => match encode_u32(&inst, xlen) {
-                Ok(bits) => outputs.push(to_hex_u32(bits)),
-                Err(e) => outputs.push(format!("Error: {}", e)),
+            Ok(inst) => {
+                match inst {
+                    asm::Instruction::RVC(_) => match encode_u16(&inst, xlen) {
+                        Ok(bits16) => outputs.push(to_hex_u16(bits16)),
+                        Err(e) => outputs.push(format!("Error: {}", e)),
+                    },
+                    _ => match encode_u32(&inst, xlen) {
+                        Ok(bits) => outputs.push(to_hex_u32(bits)),
+                        Err(e) => outputs.push(format!("Error: {}", e)),
+                    }
+                }
             },
             Err(e) => outputs.push(format!("Error: {}", e)),
         }
@@ -67,9 +77,17 @@ pub fn assemble_auto(input: &str) -> String {
         let mut last_err = String::new();
         for x in [Xlen::X32, Xlen::X64, Xlen::X128] {
             match crate::parse::parse_line(line, x) {
-                Ok(inst) => match encode_u32(&inst, x) {
-                    Ok(bits) => return to_hex_u32(bits),
-                    Err(e) => last_err = format!("编码失败({:?}): {}", x, e),
+                Ok(inst) => {
+                    match inst {
+                        asm::Instruction::RVC(_) => match encode_u16(&inst, x) {
+                            Ok(bits16) => return to_hex_u16(bits16),
+                            Err(e) => last_err = format!("编码失败({:?}): {}", x, e),
+                        },
+                        _ => match encode_u32(&inst, x) {
+                            Ok(bits) => return to_hex_u32(bits),
+                            Err(e) => last_err = format!("编码失败({:?}): {}", x, e),
+                        }
+                    }
                 },
                 Err(e) => last_err = e,
             }
