@@ -2,7 +2,7 @@
 
 extern crate wasm_bindgen_test;
 use wasm_bindgen_test::*;
-wasm_bindgen_test_configure!(run_in_node);
+wasm_bindgen_test_configure!(run_in_browser);
 use wasm_riscv_online::{assemble_auto, assemble_with_xlen};
 
 #[wasm_bindgen_test]

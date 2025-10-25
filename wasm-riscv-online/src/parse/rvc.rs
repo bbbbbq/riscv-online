@@ -16,6 +16,41 @@ pub(crate) fn try_parse(mnem: &str, ops: &[String], xlen: Xlen) -> Option<Result
             let ciw = CIWType { rd, funct3: 0, uimm: Uimm::new(u, 10) };
             Some(Ok(RVC::Caddi4spn(ciw).into()))
         }
+        // CJ: c.j imm (12-bit signed, PC-relative)
+        "c.j" => {
+            if ops.len() != 1 { return Some(Err("用法: c.j imm".into())); }
+            let imm = match parse_int(&ops[0]) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let imm_bits = match imm_signed_bits(imm, 12) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let cj = CJType { funct3: 0, target: Imm::new(imm_bits, 12) };
+            Some(Ok(RVC::Cj(cj).into()))
+        }
+        // CJ: c.jal imm (RV32 only)
+        "c.jal" => {
+            if ops.len() != 1 { return Some(Err("用法: c.jal imm".into())); }
+            match xlen { Xlen::X32 => {}, _ => return Some(Err("c.jal 仅在 RV32 可用".into())) }
+            let imm = match parse_int(&ops[0]) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let imm_bits = match imm_signed_bits(imm, 12) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let cj = CJType { funct3: 0, target: Imm::new(imm_bits, 12) };
+            Some(Ok(RVC::Cjal(cj).into()))
+        }
+        // CB: c.beqz rs1c, off (9-bit signed)
+        "c.beqz" => {
+            if ops.len() != 2 { return Some(Err("用法: c.beqz rs1, off".into())); }
+            let rs1 = match parse_register(&ops[0]) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let off = match parse_int(&ops[1]) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let off_bits = match imm_signed_bits(off, 9) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let cb = CBType { rs1, funct3: 0, off: Imm::new(off_bits, 9) };
+            Some(Ok(RVC::Cbeqz(cb).into()))
+        }
+        // CB: c.bnez rs1c, off (9-bit signed)
+        "c.bnez" => {
+            if ops.len() != 2 { return Some(Err("用法: c.bnez rs1, off".into())); }
+            let rs1 = match parse_register(&ops[0]) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let off = match parse_int(&ops[1]) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let off_bits = match imm_signed_bits(off, 9) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            let cb = CBType { rs1, funct3: 0, off: Imm::new(off_bits, 9) };
+            Some(Ok(RVC::Cbnez(cb).into()))
+        }
         // CI-like: c.addi rd, imm
         "c.addi" => {
             if ops.len() != 2 { return Some(Err("用法: c.addi rd, imm".into())); }
